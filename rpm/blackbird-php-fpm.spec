@@ -47,8 +47,5 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 
 %changelog
-* Wed Nov 25 2013 makochi <makocchi@gmail.com> - 0.1.1
-- update to 0.1.1
-
 * Tue Nov 24 2013 makochi <makocchi@gmail.com> - 0.1.0
 - first package
