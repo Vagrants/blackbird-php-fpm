@@ -11,7 +11,7 @@ from blackbird.plugins import base
 
 class ConcreteJob(base.JobBase):
     """
-    This class is Called by "Executer".
+    This class is Called by "Executor".
     Get php-fpm's status,
     and send to specified zabbix server.
     """
@@ -26,7 +26,7 @@ class ConcreteJob(base.JobBase):
             ''.format(key=item.key, value=item.value)
         )
 
-    def looped_method(self):
+    def build_items(self):
 
         # get information from server-status
         self._get_status()
@@ -52,17 +52,23 @@ class ConcreteJob(base.JobBase):
         )
 
         try:
-            response = requests.get(url)
+            response = requests.get(url,
+                                    timeout=self.options['timeout'],
+                                    verify=False)
         except requests.ConnectionError:
-            self.logger.error(
+            raise base.BlackbirdPluginError(
                 'Can not connect to {url}'
                 ''.format(url=url)
             )
-            return
 
         if response.status_code == 200:
 
             for (key, value) in json.loads(response.content).items():
+
+                # ignore some keys
+                if key == 'start time' or key == 'start since':
+                    continue
+
                 item = PhpfpmItem(
                     key=key.replace(' ', '_').lower(),
                     value=value,
@@ -71,7 +77,7 @@ class ConcreteJob(base.JobBase):
                 self._enqueue(item)
 
         else:
-            self.logger.error(
+            raise base.BlackbirdPluginError(
                 'Can not get status from {url} status:{status}'
                 ''.format(url=url, status=response.status_code)
             )
@@ -113,11 +119,12 @@ class Validator(base.ValidatorBase):
         self.__spec = (
             "[{0}]".format(__name__),
             "host = string(default='127.0.0.1')",
-            "port = integer(0, 65535, default=80)",
+            "port = integer(1, 65535, default=80)",
+            "timeout = integer(0, 600, default=3)",
             "status_uri = string(default='/status')",
             "user = string(default=None)",
             "password = string(default=None)",
             "ssl = boolean(default=False)",
-            "hostname = string(default={0})".format(self.gethostname()),
+            "hostname = string(default={0})".format(self.detect_hostname()),
         )
         return self.__spec
