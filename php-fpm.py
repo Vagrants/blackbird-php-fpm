@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # -*- encodig: utf-8 -*-
-"""
-Get the php-fpm's "status"
-"""
+# pylint: disable=C0111,C0301,R0903
+
+__VERSION__ = '0.1.1'
 
 import requests
 import json
+import re
+import subprocess
 
 from blackbird.plugins import base
 
@@ -19,17 +21,64 @@ class ConcreteJob(base.JobBase):
     def __init__(self, options, queue=None, logger=None):
         super(ConcreteJob, self).__init__(options, queue, logger)
 
-    def _enqueue(self, item):
+    def build_items(self):
+
+         # ping item
+        self._ping()
+
+        # detect php-fpm version
+        self._get_version()
+
+        # get information from server-status
+        self._get_status()
+
+    def _enqueue(self, key, value):
+
+        item = PhpfpmItem(
+            key=key,
+            value=value,
+            host=self.options['hostname']
+        )
         self.queue.put(item, block=False)
         self.logger.debug(
             'Inserted to queue {key}:{value}'
             ''.format(key=item.key, value=item.value)
         )
 
-    def build_items(self):
+    def _ping(self):
+        """
+        send ping item
+        """
 
-        # get information from server-status
-        self._get_status()
+        self._enqueue('blackbird.php-fpm.ping', 1)
+        self._enqueue('blackbird.php-fpm.version', __VERSION__)
+
+    def _get_version(self):
+        """
+        detect php-fpm version
+
+        $ php-fpm -v
+        PHP N.N.N (fpm-fcgi) ...
+        Copyright (c) ...
+        Zend Engine ...
+        """
+
+        fpm_version = 'Unknown'
+
+        try:
+            output = subprocess.Popen([self.options['path'], '-v'],
+                                      stdout=subprocess.PIPE).communicate()[0]
+            match = re.match(r"^PHP (\S+)", output)
+            if match:
+                fpm_version = match.group(1)
+
+        except OSError:
+            self.logger.debug(
+                'can not exec "{0} -v", failed to get php-fpm version'
+                ''.format(self.options['path'])
+            )
+
+        self._enqueue('php-fpm.version', fpm_version)
 
     def _get_status(self):
         """
@@ -69,12 +118,8 @@ class ConcreteJob(base.JobBase):
                 if key == 'start time' or key == 'start since':
                     continue
 
-                item = PhpfpmItem(
-                    key=key.replace(' ', '_').lower(),
-                    value=value,
-                    host=self.options['hostname']
-                )
-                self._enqueue(item)
+                self._enqueue('php-fpm.stat[{0}]'.format(key.replace(' ', '_').lower()),
+                              value)
 
         else:
             raise base.BlackbirdPluginError(
@@ -99,7 +144,7 @@ class PhpfpmItem(base.ItemBase):
         return self._data
 
     def _generate(self):
-        self._data['key'] = 'php-fpm.stat[{0}]'.format(self.key)
+        self._data['key'] = self.key
         self._data['value'] = self.value
         self._data['host'] = self.host
         self._data['clock'] = self.clock
@@ -125,6 +170,7 @@ class Validator(base.ValidatorBase):
             "user = string(default=None)",
             "password = string(default=None)",
             "ssl = boolean(default=False)",
+            "path = string(default='/usr/sbin/php-fpm')",
             "hostname = string(default={0})".format(self.detect_hostname()),
         )
         return self.__spec
