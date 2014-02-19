@@ -11,6 +11,7 @@ import subprocess
 
 from blackbird.plugins import base
 
+
 class ConcreteJob(base.JobBase):
     """
     This class is Called by "Executor".
@@ -118,8 +119,10 @@ class ConcreteJob(base.JobBase):
                 if key == 'start time' or key == 'start since':
                     continue
 
-                self._enqueue('php-fpm.stat[{0}]'.format(key.replace(' ', '_').lower()),
-                              value)
+                self._enqueue(
+                    'php-fpm.stat[{0}]'.format(key.replace(' ', '_').lower()),
+                    value
+                )
 
         else:
             raise base.BlackbirdPluginError(
