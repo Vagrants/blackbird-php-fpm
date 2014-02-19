@@ -1,2 +1,6 @@
 include php-fpm.py
 include php-fpm.cfg
+include LICENSE.txt
+include README.md
+include CHANGELOG.md
+include PROJECT.txt
