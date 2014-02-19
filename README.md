@@ -1,6 +1,8 @@
 blackbird-php-fpm
 ===============
 
+[![Build Status](https://travis-ci.org/Vagrants/blackbird-php-fpm.png?branch=development)](https://travis-ci.org/Vagrants/blackbird-php-fpm)
+
 * Get status by using "GET /status?json"
 * Please set `pm.status_path` in your php-fpm conf
 
